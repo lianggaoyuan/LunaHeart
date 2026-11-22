@@ -3,7 +3,7 @@ import { onMounted } from 'vue'
 import MessageList from './components/MessageList.vue'
 import { useChat } from './composables/useChat'
 const chat = useChat()
-const { conversations, selectedId, messages, draft, busy, error, pending, canSend } = chat
+const { conversations, selectedId, mode, messages, draft, busy, error, pending, canSend } = chat
 onMounted(chat.initialize)
 </script>
 
@@ -21,8 +21,9 @@ onMounted(chat.initialize)
       <p class="sidebar-note">本地单用户版本<br />日记、状态与知识库将分阶段接入。</p>
     </aside>
     <main>
-      <header><div><h1>与 Luna 聊天</h1><p>会话保存在本机，支持多轮上下文。</p></div><span class="badge">Mock 模式</span></header>
-      <p class="notice">当前为固定模拟回复，仅用于开发。未接入真实模型、专业知识或危机处理流程，请使用虚构信息。</p>
+      <header><div><h1>与 Luna 聊天</h1><p>会话保存在本机，支持多轮上下文。</p></div><span v-if="mode" class="badge">{{ mode === 'cloud_api' ? 'DeepSeek API' : 'Mock 模式' }}</span></header>
+      <p v-if="mode === 'cloud_api'" class="notice">发送时，当前消息和本会话的近期对话会发给 DeepSeek。请使用虚构信息。</p>
+      <p v-else-if="mode === 'local_mock'" class="notice">当前为固定模拟回复，仅用于开发，请使用虚构信息。</p>
       <MessageList :messages="messages" />
       <div v-if="error" class="error" role="alert">
         {{ error }}

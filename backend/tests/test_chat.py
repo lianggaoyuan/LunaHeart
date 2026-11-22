@@ -1,5 +1,6 @@
 from uuid import uuid4
 from fastapi.testclient import TestClient
+import httpx
 from app.config import Settings
 from app.main import create_app
 
@@ -41,6 +42,47 @@ def test_provider_failure_does_not_save_half_an_exchange(tmp_path):
         conversation = client.post("/api/v1/conversations").json()["id"]
         assert send(client, conversation).status_code == 503
         assert client.get(f"/api/v1/conversations/{conversation}/messages").json() == []
+
+
+def test_deepseek_chat_passes_context_and_stores_reply(tmp_path, monkeypatch):
+    requests = []
+    prompt_path = tmp_path / "luna_reply.txt"
+    prompt_path.write_text("初始提示词", encoding="utf-8")
+    monkeypatch.setattr("app.deepseek.LUNA_PROMPT_PATH", prompt_path)
+
+    def complete(url, **kwargs):
+        assert str(url) == "https://api.deepseek.com/v1/chat/completions"
+        assert kwargs["headers"]["Authorization"] == "Bearer test-key"
+        requests.append(kwargs["json"])
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json={"choices": [{"message": {"content": "这确实挺让人担心的。"}}]},
+        )
+
+    monkeypatch.setattr(httpx, "post", complete)
+    settings = Settings(
+        tmp_path / "test.sqlite3",
+        api_base_url="https://api.deepseek.com/v1/",
+        api_key="test-key",
+        model_name="test-model",
+    )
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/api/v1/health").json()["mode"] == "cloud_api"
+        conversation = client.post("/api/v1/conversations").json()["id"]
+        first = send(client, conversation, "我有点紧张")
+        assert first.json()["provider"] == "deepseek"
+        assert first.json()["message"]["content"] == "这确实挺让人担心的。"
+        assert requests[0]["messages"][0] == {"role": "system", "content": "初始提示词"}
+
+        prompt_path.write_text("更新后的提示词", encoding="utf-8")
+        assert send(client, conversation, "可以继续聊聊吗").status_code == 200
+        assert requests[-1]["messages"][0] == {"role": "system", "content": "更新后的提示词"}
+        assert requests[-1]["messages"][1:] == [
+            {"role": "user", "content": "我有点紧张"},
+            {"role": "assistant", "content": "这确实挺让人担心的。"},
+            {"role": "user", "content": "可以继续聊聊吗"},
+        ]
 
 
 def test_validation_and_missing_conversation(tmp_path):

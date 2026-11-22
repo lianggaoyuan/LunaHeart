@@ -26,4 +26,4 @@ class ConversationResponse(BaseModel):
 class ReplyResponse(BaseModel):
     message: MessageResponse
     sources: list[str] = Field(default_factory=list)
-    provider: Literal["mock"] = "mock"
+    provider: Literal["mock", "deepseek"] = "mock"

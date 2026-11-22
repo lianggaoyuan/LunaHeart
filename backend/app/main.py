@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from .agent import AgentService, BasicContextSource, EmptyKnowledgeRetriever, MockModelProvider
 from .api import create_router
 from .config import Settings
+from .deepseek import DeepSeekProvider
 from .domain import AppError, ModelProvider
 from .repository import ChatRepository
 from .service import ChatService
@@ -14,8 +15,16 @@ from .service import ChatService
 
 def create_app(settings: Settings | None = None, model: ModelProvider | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    if model is None:
+        api_settings = (settings.api_base_url, settings.api_key, settings.model_name)
+        if any(api_settings):
+            if not all(api_settings):
+                raise ValueError("请同时配置 LUNA_API_BASE_URL、LUNA_API_KEY 和 LUNA_MODEL")
+            model = DeepSeekProvider(*api_settings)
+        else:
+            model = MockModelProvider()
     repository = ChatRepository(settings.database_path)
-    agent = AgentService(model or MockModelProvider(), BasicContextSource(), EmptyKnowledgeRetriever())
+    agent = AgentService(model, BasicContextSource(), EmptyKnowledgeRetriever())
     service = ChatService(repository, agent, settings.history_limit)
 
     @asynccontextmanager
@@ -37,7 +46,7 @@ def create_app(settings: Settings | None = None, model: ModelProvider | None = N
         return JSONResponse(status_code=422, content={"error": {
             "code": "invalid_request", "message": "请检查输入格式，消息须为 1 至 4000 字"}})
 
-    app.include_router(create_router(repository, service))
+    app.include_router(create_router(repository, service, isinstance(model, DeepSeekProvider)))
     return app
 
 

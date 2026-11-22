@@ -7,12 +7,12 @@ from .schemas import ConversationResponse, MessageResponse, ReplyResponse, SendM
 from .service import ChatService
 
 
-def create_router(repository: ChatRepository, service: ChatService) -> APIRouter:
+def create_router(repository: ChatRepository, service: ChatService, cloud_api: bool = False) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
 
     @router.get("/health")
     def health():
-        return {"status": "ok", "mode": "local_mock"}
+        return {"status": "ok", "mode": "cloud_api" if cloud_api else "local_mock"}
 
     @router.get("/conversations", response_model=list[ConversationResponse])
     def list_conversations():
@@ -29,6 +29,7 @@ def create_router(repository: ChatRepository, service: ChatService) -> APIRouter
     @router.post("/conversations/{conversation_id}/messages", response_model=ReplyResponse)
     def send(conversation_id: UUID, payload: SendMessageRequest):
         message = service.send(str(conversation_id), str(payload.client_message_id), payload.message)
-        return ReplyResponse(message=MessageResponse(**asdict(message)))
+        provider = "deepseek" if cloud_api and not message.content.startswith("[开发模拟回复]") else "mock"
+        return ReplyResponse(message=MessageResponse(**asdict(message)), provider=provider)
 
     return router

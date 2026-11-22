@@ -1,6 +1,6 @@
 # Luna Heart 开发基础
 
-当前只实现本地单用户聊天、会话切换、历史记录与模拟多轮回复。默认不连接任何外部模型，不需要密钥。请使用虚构测试信息。
+当前支持本地单用户聊天、会话切换和历史记录。未配置 API 时使用模拟回复，配置后由 DeepSeek API 生成回复。请使用虚构测试信息。
 
 ## 启动
 
@@ -23,7 +23,11 @@ npm run dev
 
 访问 http://127.0.0.1:5173 ，接口文档为 http://127.0.0.1:8000/docs 。前端开发代理将 `/api` 转发到后端，部署时需要单独配置反向代理。
 
-可设置环境变量 `LUNA_DATABASE_PATH`（SQLite 路径）、`LUNA_ALLOWED_ORIGINS`（逗号分隔的前端地址）。前端 `VITE_API_BASE_URL` 默认 `/api/v1`。当前不自动读取 `.env`，请通过终端或运行配置传入。
+使用真实模型时，在 `backend/.env` 同时填写 `LUNA_API_BASE_URL`、`LUNA_API_KEY` 和 `LUNA_MODEL`，然后重启后端。DeepSeek 基础地址可用 `https://api.deepseek.com`。密钥只在后端读取，`.env` 已被 Git 忽略。使用 API 模式发送消息时，后端会把当前消息和本会话最近 20 条消息发给服务商。
+
+Luna 的回复提示词在 [backend/app/prompts/luna_reply.txt](backend/app/prompts/luna_reply.txt)。后端在每次生成真实回复前都会读取该文件，保存修改后下一次生成即生效。
+
+可通过进程环境变量设置 `LUNA_DATABASE_PATH`（SQLite 路径）、`LUNA_ALLOWED_ORIGINS`（逗号分隔的前端地址），或覆盖三个模型配置项。前端 `VITE_API_BASE_URL` 默认 `/api/v1`。
 
 ## 目录和职责
 
@@ -47,7 +51,7 @@ frontend/src/
 
 ## 后续模块接入
 
-1. 真实模型：实现 `ModelProvider.generate`，在 `create_app` 中注入。适配器内部处理密钥、超时与供应商协议。接入时同步修改响应的 provider 标识，不要继续显示 mock。
+1. 其他模型：实现 `ModelProvider.generate`，在 `create_app` 中注入。适配器内部处理密钥、超时与供应商协议。
 2. RAG：实现 `KnowledgeRetriever.search`。现在默认返回空结果；有专业审核知识后再接入。实际引用关联需要扩展生成结果、后端 Schema 与前端类型，不能直接把全部检索结果当作回答引用。
 3. 档案与状态：实现 `ContextSource.build`，读取经授权的数据。之后可增加用户作用域参数，不把用户状态直接由前端拼到系统提示中。
 4. 日记、状态触发：按独立业务模块新增 schemas、路由、服务和存储；触发服务复用 AgentService，不在聊天路由里加入定时判断。
@@ -57,7 +61,7 @@ frontend/src/
 
 ## 接口约定
 
-- `GET /api/v1/health`：服务状态与模拟模式。
+- `GET /api/v1/health`：服务状态与运行模式（`local_mock` 或 `cloud_api`）。
 - `POST /api/v1/conversations`：新建会话。
 - `GET /api/v1/conversations`：最多最近 100 个会话。
 - `GET /api/v1/conversations/{id}/messages`：会话历史。

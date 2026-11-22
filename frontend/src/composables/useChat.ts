@@ -1,11 +1,12 @@
 import { computed, ref } from 'vue'
 import { chatApi } from '../api'
-import type { Conversation, Message, PendingMessage } from '../types'
+import type { Conversation, Health, Message, PendingMessage } from '../types'
 
 /** Session state and request lifecycle; components only render and emit actions. */
 export function useChat() {
   const conversations = ref<Conversation[]>([])
   const selectedId = ref<string | null>(null)
+  const mode = ref<Health['mode'] | null>(null)
   const messages = ref<Message[]>([])
   const draft = ref('')
   const busy = ref(false)
@@ -24,7 +25,9 @@ export function useChat() {
 
   async function initialize() {
     await run(async () => {
-      conversations.value = await chatApi.list()
+      const [health, list] = await Promise.all([chatApi.health(), chatApi.list()])
+      mode.value = health.mode
+      conversations.value = list
       const current = conversations.value[0] ?? await chatApi.create()
       if (!conversations.value.length) conversations.value = [current]
       const history = await chatApi.history(current.id)
@@ -77,6 +80,6 @@ export function useChat() {
     error.value = '已取消本地重试；服务器可能已保存消息，请重新选择会话核对记录。'
   }
 
-  return { conversations, selectedId, messages, draft, busy, error, pending, canSend,
+  return { conversations, selectedId, mode, messages, draft, busy, error, pending, canSend,
     initialize, select, create, submit, discardPending }
 }

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import { splitReply } from '../replyBubbles'
 import type { Message } from '../types'
 const props = defineProps<{ messages: Message[] }>()
 const container = ref<HTMLElement | null>(null)
+
 watch(() => props.messages, async () => {
   await nextTick()
   container.value?.scrollTo({ top: container.value.scrollHeight, behavior: 'smooth' })
@@ -13,8 +15,11 @@ watch(() => props.messages, async () => {
   <div ref="container" class="messages" role="log" aria-label="聊天记录" aria-live="polite">
     <div v-if="!messages.length" class="empty"><h2>从一句话开始</h2><p>输入一条虚构消息，检查聊天和历史记录是否正常。</p></div>
     <article v-for="message in messages" :key="message.id" class="message" :class="message.role">
-      <strong>{{ message.role === 'user' ? '你' : 'Luna · 模拟' }}</strong>
-      <p>{{ message.content }}</p>
+      <strong>{{ message.role === 'user' ? '你' : 'Luna' }}</strong>
+      <p v-if="message.role === 'user'">{{ message.content }}</p>
+      <template v-else>
+        <p v-for="(part, index) in splitReply(message.content)" :key="index" class="reply-bubble">{{ part }}</p>
+      </template>
     </article>
   </div>
 </template>

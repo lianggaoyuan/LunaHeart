@@ -6,5 +6,6 @@ export interface Message {
   content: string
   created_at: string
 }
-export interface Reply { message: Message; sources: string[]; provider: 'mock' }
+export interface Reply { message: Message; sources: string[]; provider: 'mock' | 'deepseek' }
+export interface Health { status: 'ok'; mode: 'local_mock' | 'cloud_api' }
 export interface PendingMessage { text: string; requestId: string }
